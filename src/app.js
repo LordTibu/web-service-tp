@@ -15,15 +15,8 @@ app.use('/api/posts', postRoutes);
 app.get('/', (req, res) => res.json({ status: 'ok' }));
 
 app.use((err, req, res, next) => {
-  const statusCode = err.statusCode || err.status || 500;
-  const isServerError = statusCode >= 500;
-  const message = isServerError ? 'Server error' : err.message || 'Server error';
-
-  if (isServerError) {
-    console.error(err.stack || err);
-  }
-
-  res.status(statusCode).json({ message });
+  console.error(err.stack);
+  res.status(500).json({ message: 'Server error' });
 });
 
 module.exports = app;
