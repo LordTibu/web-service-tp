@@ -23,6 +23,9 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongo:27017/social_media'
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 
+// Health check (useful for CI readiness probes)
+app.get('/', (req, res) => res.json({ status: 'ok' }));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
