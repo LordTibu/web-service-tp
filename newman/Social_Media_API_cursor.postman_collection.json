@@ -163,7 +163,7 @@
               "",
               "var created = parseInt(pm.environment.get('create_count') || '0', 10);",
               "if (created < 3) {",
-              "  postman.setNextRequest('Posts - Create multiple posts');",
+              "  pm.execution.setNextRequest('Posts - Create multiple posts');",
               "}"
             ]
           }
