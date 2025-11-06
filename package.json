@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test:postman": "newman run Social_Media_API_cursor.postman_collection.json -e Social_Media_API.postman_environment.json --delay-request 250"
+    "test:postman": "newman run newman/Social_Media_API_cursor.postman_collection.json -e newman/Social_Media_API.postman_environment.json --delay-request 250"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

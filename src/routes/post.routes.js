@@ -67,8 +67,9 @@ router.get('/', auth, async (req, res) => {
     let nextCursor = null;
     let results = posts;
     if (posts.length > limit) {
-      const last = posts[limit - 1];
-      nextCursor = encodeCursor(last);
+      // Use the last post of current page for the nextCursor
+      nextCursor = encodeCursor(posts[limit - 1]);
+      // Remove the extra post we fetched
       results = posts.slice(0, limit);
     }
 
