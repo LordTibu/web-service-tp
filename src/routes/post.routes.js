@@ -3,7 +3,9 @@ const router = express.Router();
 const Post = require('../models/post.model');
 const auth = require('../middleware/auth.middleware');
 
-// Create post
+// ==============================
+// Create a new post
+// ==============================
 router.post('/', auth, async (req, res) => {
   try {
     const post = new Post({
@@ -13,11 +15,14 @@ router.post('/', auth, async (req, res) => {
     await post.save();
     res.status(201).json(post);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Error creating post' });
   }
 });
 
-// Helper to decode/encode cursor
+// ==============================
+// Cursor encoding/decoding helpers
+// ==============================
 function encodeCursor(doc) {
   if (!doc) return null;
   return Buffer.from(JSON.stringify({ _id: doc._id })).toString('base64');
@@ -32,50 +37,48 @@ function decodeCursor(cursor) {
   }
 }
 
-// Get posts with cursor-based pagination (infinite scroll safe)
-// Requires auth
+// ==============================
+// Get posts with cursor-based pagination
+// ==============================
 // Query params:
-// - limit (default 10)
+// - limit (default: 10)
 // - cursor (base64 JSON { _id }) - returns posts with _id less than the cursor
 router.get('/', auth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
     const cursor = req.query.cursor;
 
-    // Always sort by _id in descending order for consistent pagination
-    const sort = { _id: -1 };
-
+    const sort = { _id: -1 }; // consistent descending order
     let filter = {};
-    if (cursor != null && cursor !== '') {
+
+    if (cursor) {
       const decoded = decodeCursor(cursor);
       if (decoded && decoded._id) {
-        // Get documents with _id less than the cursor
-        filter = {
-          _id: { $lt: decoded._id }
-        };
+        filter = { _id: { $lt: decoded._id } };
       }
     }
 
+    // Fetch one extra document to know if there’s a next page
     const posts = await Post.find(filter)
       .sort(sort)
-      .limit(limit + 1) // fetch one extra to know if there is a next page
+      .limit(limit + 1)
       .populate('author', 'username')
       .populate('likes', 'username');
 
     let nextCursor = null;
     let results = posts;
+
     if (posts.length > limit) {
-      // Get the last post in the current page for the cursor
-      const lastPost = posts[limit - 1];
+      // The (limit+1)-th element determines the next cursor
+      const lastPost = posts[limit];
       nextCursor = encodeCursor(lastPost);
-      // Only return the requested number of posts
       results = posts.slice(0, limit);
     }
 
     res.json({
       posts: results,
       nextCursor,
-      limit: limit,
+      limit,
       returned: results.length
     });
   } catch (error) {
@@ -84,7 +87,9 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Like/Unlike a post
+// ==============================
+// Like / Unlike a post
+// ==============================
 router.post('/:postId/like', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -94,16 +99,15 @@ router.post('/:postId/like', auth, async (req, res) => {
 
     const likeIndex = post.likes.indexOf(req.userId);
     if (likeIndex === -1) {
-      // Like the post
-      post.likes.push(req.userId);
+      post.likes.push(req.userId); // like
     } else {
-      // Unlike the post
-      post.likes.splice(likeIndex, 1);
+      post.likes.splice(likeIndex, 1); // unlike
     }
 
     await post.save();
     res.json(post);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Error processing like' });
   }
 });
