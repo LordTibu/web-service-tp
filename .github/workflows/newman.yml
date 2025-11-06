@@ -47,4 +47,10 @@ jobs:
           until curl -sSf http://localhost:3000/ || [ $n -ge 30 ]; do sleep 1; n=$((n+1)); done
 
       - name: Run Newman collection
-        run: npx newman run /newman/Social_Media_API_cursor.postman_collection.json -e /newman/Social_Media_API.postman_environment.json --delay-request 250 
+        run: npx newman run newman/Social_Media_API_cursor.postman_collection.json -e newman/Social_Media_API.postman_environment.json --delay-request 250 -r cli,junit --reporter-junit-export newman-results.xml
+
+      - name: Upload Newman JUnit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-results
+          path: newman-results.xml
