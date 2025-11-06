@@ -50,14 +50,10 @@ router.get('/', auth, async (req, res) => {
       if (decoded && decoded.createdAt && decoded._id) {
         // Documents strictly older than the cursor
         filter = {
+          createdAt: { $lte: new Date(decoded.createdAt) },
           $or: [
             { createdAt: { $lt: new Date(decoded.createdAt) } },
-            {
-              $and: [
-                { createdAt: decoded.createdAt },
-                { _id: { $lt: decoded._id } }
-              ]
-            }
+            { _id: { $lt: decoded._id } }
           ]
         };
       }
@@ -72,9 +68,10 @@ router.get('/', auth, async (req, res) => {
     let nextCursor = null;
     let results = posts;
     if (posts.length > limit) {
-      // Use the last post of current page for the nextCursor
-      nextCursor = encodeCursor(posts[limit - 1]);
-      // Remove the extra post we fetched
+      // Get the last post in the current page for the cursor
+      const lastPost = posts[limit - 1];
+      nextCursor = encodeCursor(lastPost);
+      // Only return the requested number of posts
       results = posts.slice(0, limit);
     }
 
