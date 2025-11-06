@@ -1,9 +1,10 @@
-const express = require('express');
+$const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Post = require('../models/post.model');
 const auth = require('../middleware/auth.middleware');
 
-// Encode/decode cursor
+// Encode/decode cursor (based on _id)
 function encodeCursor(doc) {
   return doc ? Buffer.from(doc._id.toString()).toString('base64') : null;
 }
@@ -16,7 +17,7 @@ function decodeCursor(cursor) {
   }
 }
 
-// Create a new post
+// Create new post
 router.post('/', auth, async (req, res) => {
   try {
     const post = new Post({
@@ -26,22 +27,25 @@ router.post('/', auth, async (req, res) => {
     await post.save();
     res.status(201).json(post);
   } catch (err) {
-    console.error(err);
+    console.error('Error creating post:', err);
     res.status(500).json({ message: 'Error creating post' });
   }
 });
 
-// Get posts (cursor pagination)
+// Get posts with cursor-based pagination
 router.get('/', auth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
     const cursor = req.query.cursor;
     const sort = { _id: -1 };
-
     let filter = {};
+
     if (cursor) {
-      const decodedId = decodeCursor(cursor);
-      if (decodedId) filter._id = { $lt: decodedId };
+      const decoded = decodeCursor(cursor);
+      // Validate decoded ID before using it
+      if (mongoose.Types.ObjectId.isValid(decoded)) {
+        filter._id = { $lt: new mongoose.Types.ObjectId(decoded) };
+      }
     }
 
     const posts = await Post.find(filter)
@@ -61,12 +65,12 @@ router.get('/', auth, async (req, res) => {
       returned: results.length
     });
   } catch (err) {
-    console.error(err);
+    console.error('Error fetching posts:', err);
     res.status(500).json({ message: 'Error fetching posts' });
   }
 });
 
-// Like / Unlike
+// Like/unlike a post
 router.post('/:postId/like', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
@@ -79,7 +83,7 @@ router.post('/:postId/like', auth, async (req, res) => {
     await post.save();
     res.json(post);
   } catch (err) {
-    console.error(err);
+    console.error('Error processing like:', err);
     res.status(500).json({ message: 'Error processing like' });
   }
 });
