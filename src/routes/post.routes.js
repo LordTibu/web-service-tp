@@ -3,9 +3,20 @@ const router = express.Router();
 const Post = require('../models/post.model');
 const auth = require('../middleware/auth.middleware');
 
-// ==============================
+// Encode/decode cursor
+function encodeCursor(doc) {
+  return doc ? Buffer.from(doc._id.toString()).toString('base64') : null;
+}
+
+function decodeCursor(cursor) {
+  try {
+    return Buffer.from(cursor, 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
 // Create a new post
-// ==============================
 router.post('/', auth, async (req, res) => {
   try {
     const post = new Post({
@@ -14,66 +25,34 @@ router.post('/', auth, async (req, res) => {
     });
     await post.save();
     res.status(201).json(post);
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Error creating post' });
   }
 });
 
-// ==============================
-// Cursor encoding/decoding helpers
-// ==============================
-function encodeCursor(doc) {
-  if (!doc) return null;
-  return Buffer.from(JSON.stringify({ _id: doc._id })).toString('base64');
-}
-
-function decodeCursor(cursor) {
-  try {
-    const str = Buffer.from(cursor, 'base64').toString('utf8');
-    return JSON.parse(str);
-  } catch (e) {
-    return null;
-  }
-}
-
-// ==============================
-// Get posts with cursor-based pagination
-// ==============================
-// Query params:
-// - limit (default: 10)
-// - cursor (base64 JSON { _id }) - returns posts with _id less than the cursor
+// Get posts (cursor pagination)
 router.get('/', auth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
     const cursor = req.query.cursor;
+    const sort = { _id: -1 };
 
-    const sort = { _id: -1 }; // consistent descending order
     let filter = {};
-
     if (cursor) {
-      const decoded = decodeCursor(cursor);
-      if (decoded && decoded._id) {
-        filter = { _id: { $lt: decoded._id } };
-      }
+      const decodedId = decodeCursor(cursor);
+      if (decodedId) filter._id = { $lt: decodedId };
     }
 
-    // Fetch one extra document to know if there’s a next page
     const posts = await Post.find(filter)
       .sort(sort)
       .limit(limit + 1)
       .populate('author', 'username')
       .populate('likes', 'username');
 
-    let nextCursor = null;
-    let results = posts;
-
-    if (posts.length > limit) {
-      // The (limit+1)-th element determines the next cursor
-      const lastPost = posts[limit];
-      nextCursor = encodeCursor(lastPost);
-      results = posts.slice(0, limit);
-    }
+    const hasNextPage = posts.length > limit;
+    const results = hasNextPage ? posts.slice(0, limit) : posts;
+    const nextCursor = hasNextPage ? encodeCursor(posts[limit - 1]) : null;
 
     res.json({
       posts: results,
@@ -81,33 +60,26 @@ router.get('/', auth, async (req, res) => {
       limit,
       returned: results.length
     });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Error fetching posts' });
   }
 });
 
-// ==============================
-// Like / Unlike a post
-// ==============================
+// Like / Unlike
 router.post('/:postId/like', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
+    if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const likeIndex = post.likes.indexOf(req.userId);
-    if (likeIndex === -1) {
-      post.likes.push(req.userId); // like
-    } else {
-      post.likes.splice(likeIndex, 1); // unlike
-    }
+    const index = post.likes.indexOf(req.userId);
+    if (index === -1) post.likes.push(req.userId);
+    else post.likes.splice(index, 1);
 
     await post.save();
     res.json(post);
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Error processing like' });
   }
 });
