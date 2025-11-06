@@ -48,11 +48,16 @@ router.get('/', auth, async (req, res) => {
     if (cursor != null && cursor !== '') {
       const decoded = decodeCursor(cursor);
       if (decoded && decoded.createdAt && decoded._id) {
-        // Documents strictly older than the cursor (createdAt, then _id to break ties)
+        // Documents strictly older than the cursor
         filter = {
           $or: [
             { createdAt: { $lt: new Date(decoded.createdAt) } },
-            { createdAt: new Date(decoded.createdAt), _id: { $lt: decoded._id } }
+            {
+              $and: [
+                { createdAt: decoded.createdAt },
+                { _id: { $lt: decoded._id } }
+              ]
+            }
           ]
         };
       }

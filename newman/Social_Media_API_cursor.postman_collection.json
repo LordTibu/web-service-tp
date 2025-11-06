@@ -60,7 +60,13 @@
         "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api","posts"] }
       },
       "event": [
-        { "listen": "prerequest", "script": { "exec": [ "if(!pm.environment.get('create_count')) pm.environment.set('create_count', 0);", "pm.environment.set('content', 'Post content #' + (pm.environment.get('create_count') + 1));", "pm.environment.set('create_count', pm.environment.get('create_count') + 1);" ] } },
+        { "listen": "prerequest", "script": { "exec": [ 
+          "if(!pm.environment.get('create_count')) pm.environment.set('create_count', 0);",
+          "// Add a delay of 100ms between posts to ensure different timestamps",
+          "setTimeout(function() {",
+          "    pm.environment.set('content', 'Post content #' + (pm.environment.get('create_count') + 1));",
+          "    pm.environment.set('create_count', pm.environment.get('create_count') + 1);",
+          "}, 100);" ] } },
         { "listen": "test", "script": { "exec": [ "pm.test('Create post success', function () {", "  pm.response.to.have.status(201);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('_id');", "  pm.expect(json).to.have.property('content');", "  pm.environment.set('last_post_id', json._id);", "});" ] } }
       ]
     },
