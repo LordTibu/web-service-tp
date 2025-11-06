@@ -9,9 +9,27 @@
       "name": "Auth - Register",
       "request": {
         "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{reg_username}}\",\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}" },
-        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api","auth","register"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{reg_username}}\",\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        }
       },
       "event": [
         {
@@ -34,7 +52,10 @@
               "  var json = pm.response.json();",
               "  pm.expect(json).to.have.property('token');",
               "  pm.environment.set('jwt_token', json.token);",
-              "});"
+              "});",
+              "pm.environment.set('create_count', '0');",
+              "pm.environment.unset('nextCursor');",
+              "pm.environment.unset('first_page_post_ids');"
             ]
           }
         }
@@ -44,68 +65,295 @@
       "name": "Auth - Login",
       "request": {
         "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}" },
-        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
       },
-      "event": [ { "listen": "test", "script": { "exec": [ "pm.test('Login returns token', function () {", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('token');", "  pm.environment.set('jwt_token', json.token);", "});" ] } } ]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Login returns token', function () {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json).to.have.property('token');",
+              "  pm.environment.set('jwt_token', json.token);",
+              "});"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Posts - Create multiple posts",
       "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
         "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{ \"content\": \"{{content}}\" }" },
-        "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api","posts"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"content\": \"{{content}}\" }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/posts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ]
+        }
       },
       "event": [
-        { "listen": "prerequest", "script": { "exec": [ 
-          "if(!pm.environment.get('create_count')) pm.environment.set('create_count', 0);",
-          "// Add a delay of 100ms between posts to ensure different timestamps",
-          "setTimeout(function() {",
-          "    pm.environment.set('content', 'Post content #' + (pm.environment.get('create_count') + 1));",
-          "    pm.environment.set('create_count', pm.environment.get('create_count') + 1);",
-          "}, 100);" ] } },
-        { "listen": "test", "script": { "exec": [ "pm.test('Create post success', function () {", "  pm.response.to.have.status(201);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('_id');", "  pm.expect(json).to.have.property('content');", "  pm.environment.set('last_post_id', json._id);", "});" ] } }
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var currentCount = parseInt(pm.environment.get('create_count') || '0', 10);",
+              "var nextCount = currentCount + 1;",
+              "var content = 'Post content #' + nextCount + ' - ' + new Date().toISOString();",
+              "pm.environment.set('content', content);",
+              "pm.environment.set('create_count', String(nextCount));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Create post success', function () {",
+              "  pm.response.to.have.status(201);",
+              "  var json = pm.response.json();",
+              "  pm.expect(json).to.have.property('_id');",
+              "  pm.expect(json).to.have.property('content');",
+              "  pm.environment.set('last_post_id', json._id);",
+              "});",
+              "",
+              "var created = parseInt(pm.environment.get('create_count') || '0', 10);",
+              "if (created < 3) {",
+              "  postman.setNextRequest('Posts - Create multiple posts');",
+              "}"
+            ]
+          }
+        }
       ]
     },
     {
       "name": "Posts - Get first page",
       "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
         "method": "GET",
-        "url": { "raw": "{{baseUrl}}/api/posts?limit=2", "host": ["{{baseUrl}}"], "path": ["api","posts"], "query": [ { "key": "limit", "value": "2" } ] }
+        "url": {
+          "raw": "{{baseUrl}}/api/posts?limit=2",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "2"
+            }
+          ]
+        }
       },
-      "event": [ { "listen": "test", "script": { "exec": [ "pm.test('Get first page returns posts and nextCursor or null', function () {", "  pm.response.to.have.status(200);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('posts');", "  pm.expect(json.posts).to.be.an('array');", "  pm.environment.set('first_page_post_ids', JSON.stringify(json.posts.map(function(p){return p._id;})));", "  if (json.nextCursor) pm.environment.set('nextCursor', json.nextCursor);", "});" ] } } ]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Get first page returns posts and optional nextCursor', function () {",
+              "  pm.response.to.have.status(200);",
+              "  var json = pm.response.json();",
+              "  pm.expect(json).to.have.property('posts');",
+              "  pm.expect(json.posts).to.be.an('array');",
+              "  pm.expect(json).to.have.property('limit');",
+              "  pm.expect(json).to.have.property('returned');",
+              "  if (json.returned > json.limit) {",
+              "    pm.expect.fail('returned count cannot exceed requested limit');",
+              "  }",
+              "  pm.environment.set('first_page_post_ids', JSON.stringify(json.posts.map(function(p){return p._id;})));",
+              "  if (json.nextCursor) {",
+              "    pm.environment.set('nextCursor', json.nextCursor);",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Posts - Create a new post (simulate new content between pages)",
       "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
         "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{ \"content\": \"A newer post appearing between pages\" }" },
-        "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api","posts"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"content\": \"A newer post appearing between pages\" }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/posts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ]
+        }
       },
-      "event": [ { "listen": "test", "script": { "exec": [ "pm.test('Inserted new post', function () {", "  pm.response.to.have.status(201);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('_id');", "  pm.environment.set('mid_post_id', json._id);", "});" ] } } ]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Inserted new post', function () {",
+              "  pm.response.to.have.status(201);",
+              "  var json = pm.response.json();",
+              "  pm.expect(json).to.have.property('_id');",
+              "  pm.environment.set('mid_post_id', json._id);",
+              "});"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Posts - Get second page using nextCursor",
       "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
         "method": "GET",
-        "url": { "raw": "{{baseUrl}}/api/posts?limit=2&cursor={{nextCursor}}", "host": ["{{baseUrl}}"], "path": ["api","posts"], "query": [ { "key": "limit", "value": "2" }, { "key": "cursor", "value": "{{nextCursor}}" } ] }
+        "url": {
+          "raw": "{{baseUrl}}/api/posts?limit=2&cursor={{nextCursor}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "2"
+            },
+            {
+              "key": "cursor",
+              "value": "{{nextCursor}}"
+            }
+          ]
+        }
       },
       "event": [
-        { "listen": "test", "script": { "exec": [ "pm.test('Second page returns posts and no duplicates with first page', function () {", "  pm.response.to.have.status(200);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('posts');", "  var firstIds = JSON.parse(pm.environment.get('first_page_post_ids') || '[]');", "  var secondIds = json.posts.map(function(p){return p._id;});", "  secondIds.forEach(function(id){ pm.expect(firstIds.indexOf(id)).to.eql(-1); });", "});" ] } }
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "if (!pm.environment.get('nextCursor')) {",
+              "  throw new Error('Missing nextCursor from previous response');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Second page returns posts and no duplicates with first page', function () {",
+              "  pm.response.to.have.status(200);",
+              "  var json = pm.response.json();",
+              "  pm.expect(json).to.have.property('posts');",
+              "  pm.expect(json.posts).to.be.an('array');",
+              "  var firstIds = JSON.parse(pm.environment.get('first_page_post_ids') || '[]');",
+              "  var secondIds = json.posts.map(function(p){return p._id;});",
+              "  secondIds.forEach(function(id){ pm.expect(firstIds.indexOf(id)).to.eql(-1); });",
+              "});"
+            ]
+          }
+        }
       ]
     }
   ],
   "event": [],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
-    { "key": "jwt_token", "value": "", "type": "string" },
-    { "key": "rand", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rand",
+      "value": ""
+    }
   ]
 }

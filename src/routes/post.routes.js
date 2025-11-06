@@ -1,30 +1,44 @@
 const express = require('express');
-const router = express.Router();
 const mongoose = require('mongoose');
 const Post = require('../models/post.model');
 const auth = require('../middleware/auth.middleware');
 
-// --- Helpers ---
+const router = express.Router();
+
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 50;
+
 function encodeCursor(doc) {
-  return doc ? Buffer.from(doc._id.toString()).toString('base64') : null;
+  if (!doc || !doc._id) {
+    return null;
+  }
+  return Buffer.from(doc._id.toString()).toString('base64');
 }
 
 function decodeCursor(cursor) {
   try {
     return Buffer.from(cursor, 'base64').toString('utf8');
-  } catch {
+  } catch (error) {
     return null;
   }
 }
 
-// --- Create post ---
 router.post('/', auth, async (req, res) => {
+  const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+
+  if (!content) {
+    return res.status(400).json({ message: 'Content is required' });
+  }
+
   try {
     const post = new Post({
-      content: req.body.content,
+      content,
       author: req.userId
     });
+
     await post.save();
+    await post.populate('author', 'username');
+
     res.status(201).json(post);
   } catch (err) {
     console.error('Error creating post:', err);
@@ -32,31 +46,33 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// --- Get posts (cursor pagination) ---
 router.get('/', auth, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
-    const cursor = req.query.cursor;
-    const sort = { _id: -1 };
+    const parsedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+      ? Math.min(parsedLimit, MAX_LIMIT)
+      : DEFAULT_LIMIT;
 
-    let filter = {};
-    if (cursor) {
-      const decoded = decodeCursor(cursor);
-      if (mongoose.Types.ObjectId.isValid(decoded)) {
-        // on récupère les posts plus anciens
-        filter._id = { $lt: new mongoose.Types.ObjectId(decoded) };
+    const rawCursor = typeof req.query.cursor === 'string' ? req.query.cursor.trim() : null;
+    const filter = {};
+
+    if (rawCursor) {
+      const decoded = decodeCursor(rawCursor);
+      if (!decoded || !mongoose.Types.ObjectId.isValid(decoded)) {
+        return res.status(400).json({ message: 'Invalid cursor' });
       }
+
+      filter._id = { $lt: new mongoose.Types.ObjectId(decoded) };
     }
 
     const posts = await Post.find(filter)
-      .sort(sort)
+      .sort({ _id: -1 })
       .limit(limit + 1)
       .populate('author', 'username')
       .populate('likes', 'username');
 
     const hasNext = posts.length > limit;
     const results = hasNext ? posts.slice(0, limit) : posts;
-
     const nextCursor = hasNext ? encodeCursor(results[results.length - 1]) : null;
 
     res.json({
@@ -71,18 +87,38 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// --- Like / Unlike ---
 router.post('/:postId/like', auth, async (req, res) => {
   try {
-    const post = await Post.findById(req.params.postId);
-    if (!post) return res.status(404).json({ message: 'Post not found' });
+    const { postId } = req.params;
 
-    const index = post.likes.indexOf(req.userId);
-    if (index === -1) post.likes.push(req.userId);
-    else post.likes.splice(index, 1);
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({ message: 'Invalid post id' });
+    }
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(req.userId);
+    const alreadyLiked = post.likes.some(like => like.equals(userObjectId));
+
+    if (alreadyLiked) {
+      post.likes.pull(userObjectId);
+    } else {
+      post.likes.addToSet(userObjectId);
+    }
 
     await post.save();
-    res.json(post);
+
+    const populatedPost = await Post.findById(postId)
+      .populate('author', 'username')
+      .populate('likes', 'username');
+
+    res.json({
+      post: populatedPost,
+      liked: !alreadyLiked
+    });
   } catch (err) {
     console.error('Error processing like:', err);
     res.status(500).json({ message: 'Error processing like' });
