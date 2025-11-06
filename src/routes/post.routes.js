@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const Post = require('../models/post.model');
 const auth = require('../middleware/auth.middleware');
 
-// Encode/decode cursor (based on _id)
+// --- Helpers ---
 function encodeCursor(doc) {
   return doc ? Buffer.from(doc._id.toString()).toString('base64') : null;
 }
@@ -17,7 +17,7 @@ function decodeCursor(cursor) {
   }
 }
 
-// Create new post
+// --- Create post ---
 router.post('/', auth, async (req, res) => {
   try {
     const post = new Post({
@@ -32,18 +32,18 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// Get posts with cursor-based pagination
+// --- Get posts (cursor pagination) ---
 router.get('/', auth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
     const cursor = req.query.cursor;
     const sort = { _id: -1 };
-    let filter = {};
 
+    let filter = {};
     if (cursor) {
       const decoded = decodeCursor(cursor);
-      // Validate decoded ID before using it
       if (mongoose.Types.ObjectId.isValid(decoded)) {
+        // on récupère les posts plus anciens
         filter._id = { $lt: new mongoose.Types.ObjectId(decoded) };
       }
     }
@@ -54,9 +54,10 @@ router.get('/', auth, async (req, res) => {
       .populate('author', 'username')
       .populate('likes', 'username');
 
-    const hasNextPage = posts.length > limit;
-    const results = hasNextPage ? posts.slice(0, limit) : posts;
-    const nextCursor = hasNextPage ? encodeCursor(posts[limit - 1]) : null;
+    const hasNext = posts.length > limit;
+    const results = hasNext ? posts.slice(0, limit) : posts;
+
+    const nextCursor = hasNext ? encodeCursor(results[results.length - 1]) : null;
 
     res.json({
       posts: results,
@@ -70,7 +71,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Like/unlike a post
+// --- Like / Unlike ---
 router.post('/:postId/like', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
