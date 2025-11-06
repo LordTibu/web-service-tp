@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies (including dev)
+      - name: Install dependencies
         run: npm ci
 
       - name: Wait for MongoDB to be ready
@@ -34,7 +34,7 @@ jobs:
           n=0
           until nc -z localhost 27017 || [ $n -ge 30 ]; do sleep 1; n=$((n+1)); done
 
-      - name: Start API (background)
+      - name: Start API
         env:
           MONGODB_URI: mongodb://localhost:27017/social_media
           JWT_SECRET: testsecret
@@ -47,10 +47,4 @@ jobs:
           until curl -sSf http://localhost:3000/ || [ $n -ge 30 ]; do sleep 1; n=$((n+1)); done
 
       - name: Run Newman collection
-        run: npx newman run Social_Media_API_cursor.postman_collection.json -e Social_Media_API.postman_environment.json --delay-request 250 -r cli,junit --reporter-junit-export newman-results.xml
-
-      - name: Upload Newman JUnit report
-        uses: actions/upload-artifact@v4
-        with:
-          name: newman-results
-          path: newman-results.xml
+        run: npx newman run /newman/Social_Media_API_cursor.postman_collection.json -e /newman/Social_Media_API.postman_environment.json --delay-request 250 

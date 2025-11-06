@@ -45,7 +45,7 @@ router.get('/', auth, async (req, res) => {
     const sort = { createdAt: -1, _id: -1 };
 
     let filter = {};
-    if (cursor) {
+    if (cursor != null && cursor !== '') {
       const decoded = decodeCursor(cursor);
       if (decoded && decoded.createdAt && decoded._id) {
         // Documents strictly older than the cursor (createdAt, then _id to break ties)
