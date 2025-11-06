@@ -20,7 +20,7 @@ router.post('/', auth, async (req, res) => {
 // Helper to decode/encode cursor
 function encodeCursor(doc) {
   if (!doc) return null;
-  return Buffer.from(JSON.stringify({ createdAt: doc.createdAt, _id: doc._id })).toString('base64');
+  return Buffer.from(JSON.stringify({ _id: doc._id })).toString('base64');
 }
 
 function decodeCursor(cursor) {
@@ -36,25 +36,22 @@ function decodeCursor(cursor) {
 // Requires auth
 // Query params:
 // - limit (default 10)
-// - cursor (base64 JSON { createdAt, _id }) - returns posts older than the cursor
+// - cursor (base64 JSON { _id }) - returns posts with _id less than the cursor
 router.get('/', auth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
     const cursor = req.query.cursor;
 
-    const sort = { createdAt: -1, _id: -1 };
+    // Always sort by _id in descending order for consistent pagination
+    const sort = { _id: -1 };
 
     let filter = {};
     if (cursor != null && cursor !== '') {
       const decoded = decodeCursor(cursor);
-      if (decoded && decoded.createdAt && decoded._id) {
-        // Documents strictly older than the cursor
+      if (decoded && decoded._id) {
+        // Get documents with _id less than the cursor
         filter = {
-          createdAt: { $lte: new Date(decoded.createdAt) },
-          $or: [
-            { createdAt: { $lt: new Date(decoded.createdAt) } },
-            { _id: { $lt: decoded._id } }
-          ]
+          _id: { $lt: decoded._id }
         };
       }
     }
