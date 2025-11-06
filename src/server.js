@@ -26,7 +26,7 @@ app.use('/api/posts', postRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  res.status(500).json({ message: 'Server error' });
 });
 
 const PORT = process.env.PORT || 3000;

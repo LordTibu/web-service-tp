@@ -17,29 +17,69 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// Get all posts with pagination
-router.get('/', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+// Helper to decode/encode cursor
+function encodeCursor(doc) {
+  if (!doc) return null;
+  return Buffer.from(JSON.stringify({ createdAt: doc.createdAt, _id: doc._id })).toString('base64');
+}
 
-    const posts = await Post.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
+function decodeCursor(cursor) {
+  try {
+    const str = Buffer.from(cursor, 'base64').toString('utf8');
+    return JSON.parse(str);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Get posts with cursor-based pagination (infinite scroll safe)
+// Requires auth
+// Query params:
+// - limit (default 10)
+// - cursor (base64 JSON { createdAt, _id }) - returns posts older than the cursor
+router.get('/', auth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+    const cursor = req.query.cursor;
+
+    const sort = { createdAt: -1, _id: -1 };
+
+    let filter = {};
+    if (cursor) {
+      const decoded = decodeCursor(cursor);
+      if (decoded && decoded.createdAt && decoded._id) {
+        // Documents strictly older than the cursor (createdAt, then _id to break ties)
+        filter = {
+          $or: [
+            { createdAt: { $lt: new Date(decoded.createdAt) } },
+            { createdAt: new Date(decoded.createdAt), _id: { $lt: decoded._id } }
+          ]
+        };
+      }
+    }
+
+    const posts = await Post.find(filter)
+      .sort(sort)
+      .limit(limit + 1) // fetch one extra to know if there is a next page
       .populate('author', 'username')
       .populate('likes', 'username');
 
-    const total = await Post.countDocuments();
+    let nextCursor = null;
+    let results = posts;
+    if (posts.length > limit) {
+      const last = posts[limit - 1];
+      nextCursor = encodeCursor(last);
+      results = posts.slice(0, limit);
+    }
 
     res.json({
-      posts,
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
-      totalPosts: total
+      posts: results,
+      nextCursor,
+      limit: limit,
+      returned: results.length
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Error fetching posts' });
   }
 });
