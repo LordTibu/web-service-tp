@@ -1,58 +1,9 @@
 const express = require('express');
+const authController = require('../controllers/auth.controller');
+
 const router = express.Router();
-const jwt = require('jsonwebtoken');
-const User = require('../models/user.model');
 
-// Register
-router.post('/register', async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-    
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Username or email already exists' });
-    }
-
-    const user = new User({ username, email, password });
-    await user.save();
-
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'your_jwt_secret_key',
-      { expiresIn: '24h' }
-    );
-
-    res.status(201).json({ token });
-  } catch (error) {
-    res.status(500).json({ message: 'Error creating user' });
-  }
-});
-
-// Login
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const isValidPassword = await user.comparePassword(password);
-    if (!isValidPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || 'your_jwt_secret_key',
-      { expiresIn: '24h' }
-    );
-
-    res.json({ token });
-  } catch (error) {
-    res.status(500).json({ message: 'Error during login' });
-  }
-});
+router.post('/register', authController.register);
+router.post('/login', authController.login);
 
 module.exports = router;

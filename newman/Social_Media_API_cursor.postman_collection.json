@@ -9,17 +9,35 @@
       "name": "Auth - Register",
       "request": {
         "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{reg_username}}\",\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}" },
-        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api","auth","register"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{reg_username}}\",\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        }
       },
       "event": [
         {
           "listen": "prerequest",
           "script": {
             "exec": [
-              "// Generate per-run credentials and store in environment",
-              "var salt = Math.floor(Math.random() * 1000000);",
+              "// Generate per-run credentials to avoid collisions",
+              "const salt = Math.floor(Math.random() * 1000000);",
               "pm.environment.set('reg_username', 'testuser_' + salt);",
               "pm.environment.set('reg_email', 'test+' + salt + '@example.com');",
               "pm.environment.set('reg_password', 'Password123!');"
@@ -30,11 +48,21 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('Register returns token', function () {",
-              "  var json = pm.response.json();",
-              "  pm.expect(json).to.have.property('token');",
-              "  pm.environment.set('jwt_token', json.token);",
-              "});"
+              "// Basic contract: 201 status with token + user payload",
+              "pm.response.to.have.status(201);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('token');",
+              "pm.expect(json).to.have.nested.property('user.id');",
+              "pm.expect(json).to.have.nested.property('user.username');",
+              "pm.expect(json).to.have.nested.property('user.email');",
+              "pm.environment.set('jwt_token', json.token);",
+              "pm.environment.set('user_id', json.user.id);",
+              "pm.environment.set('user_username', json.user.username);",
+              "// Reset run-scoped state for downstream requests",
+              "pm.environment.set('create_count', '0');",
+              "pm.environment.unset('nextCursor');",
+              "pm.environment.unset('first_page_post_ids');",
+              "pm.environment.unset('likes_after_like');"
             ]
           }
         }
@@ -44,68 +72,415 @@
       "name": "Auth - Login",
       "request": {
         "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}" },
-        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] }
-      },
-      "event": [ { "listen": "test", "script": { "exec": [ "pm.test('Login returns token', function () {", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('token');", "  pm.environment.set('jwt_token', json.token);", "});" ] } } ]
-    },
-    {
-      "name": "Posts - Create multiple posts",
-      "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
-        "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{ \"content\": \"{{content}}\" }" },
-        "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api","posts"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{reg_email}}\",\n  \"password\": \"{{reg_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
       },
       "event": [
-        { "listen": "prerequest", "script": { "exec": [ 
-          "if(!pm.environment.get('create_count')) pm.environment.set('create_count', 0);",
-          "// Add a delay of 100ms between posts to ensure different timestamps",
-          "setTimeout(function() {",
-          "    pm.environment.set('content', 'Post content #' + (pm.environment.get('create_count') + 1));",
-          "    pm.environment.set('create_count', pm.environment.get('create_count') + 1);",
-          "}, 100);" ] } },
-        { "listen": "test", "script": { "exec": [ "pm.test('Create post success', function () {", "  pm.response.to.have.status(201);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('_id');", "  pm.expect(json).to.have.property('content');", "  pm.environment.set('last_post_id', json._id);", "});" ] } }
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Login should succeed with the freshly registered credentials",
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('token');",
+              "pm.expect(json).to.have.nested.property('user.id', pm.environment.get('user_id'));",
+              "pm.expect(json).to.have.nested.property('user.username', pm.environment.get('user_username'));",
+              "pm.environment.set('jwt_token', json.token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Posts - Create seed posts",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"content\": \"{{content}}\" }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/posts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Generate unique post content for pagination fixtures",
+              "const currentCount = parseInt(pm.environment.get('create_count') || '0', 10);",
+              "const nextCount = currentCount + 1;",
+              "const content = `Post content #${nextCount} - ${new Date().toISOString()}`;",
+              "pm.environment.set('content', content);",
+              "pm.environment.set('create_count', String(nextCount));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Every creation must return the persisted document",
+              "pm.response.to.have.status(201);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('_id');",
+              "pm.expect(json).to.have.property('content');",
+              "pm.expect(json).to.have.property('author');",
+              "pm.environment.set('last_post_id', json._id);",
+              "pm.test('likesCount mirrors likes array length', function () {",
+              "  const likesCount = Array.isArray(json.likes) ? json.likes.length : 0;",
+              "  pm.expect(json.likesCount).to.eql(likesCount);",
+              "});",
+              "// Loop until we have three base posts for pagination",
+              "const created = parseInt(pm.environment.get('create_count') || '0', 10);",
+              "if (created < 3) {",
+              "  postman.setNextRequest('Posts - Create seed posts');",
+              "}"
+            ]
+          }
+        }
       ]
     },
     {
       "name": "Posts - Get first page",
       "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
         "method": "GET",
-        "url": { "raw": "{{baseUrl}}/api/posts?limit=2", "host": ["{{baseUrl}}"], "path": ["api","posts"], "query": [ { "key": "limit", "value": "2" } ] }
+        "url": {
+          "raw": "{{baseUrl}}/api/posts?limit=2",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "2"
+            }
+          ]
+        }
       },
-      "event": [ { "listen": "test", "script": { "exec": [ "pm.test('Get first page returns posts and nextCursor or null', function () {", "  pm.response.to.have.status(200);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('posts');", "  pm.expect(json.posts).to.be.an('array');", "  pm.environment.set('first_page_post_ids', JSON.stringify(json.posts.map(function(p){return p._id;})));", "  if (json.nextCursor) pm.environment.set('nextCursor', json.nextCursor);", "});" ] } } ]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// First page should respect limit and expose pagination cursor",
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('posts');",
+              "pm.expect(json.posts).to.be.an('array');",
+              "pm.expect(json).to.have.property('limit', 2);",
+              "pm.expect(json).to.have.property('returned');",
+              "pm.expect(json.returned).to.be.at.most(json.limit);",
+              "pm.environment.set('first_page_post_ids', JSON.stringify(json.posts.map((p) => p._id)));",
+              "if (json.nextCursor) {",
+              "  pm.environment.set('nextCursor', json.nextCursor);",
+              "} else {",
+              "  pm.expect.fail('Expected a nextCursor to continue pagination');",
+              "}"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Posts - Create a new post (simulate new content between pages)",
+      "name": "Posts - Insert newer post between pages",
       "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
         "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{ \"content\": \"A newer post appearing between pages\" }" },
-        "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api","posts"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"content\": \"A newer post appearing between pages\" }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/posts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ]
+        }
       },
-      "event": [ { "listen": "test", "script": { "exec": [ "pm.test('Inserted new post', function () {", "  pm.response.to.have.status(201);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('_id');", "  pm.environment.set('mid_post_id', json._id);", "});" ] } } ]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Create an extra post to ensure cursor pagination skips newer content",
+              "pm.response.to.have.status(201);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('_id');",
+              "pm.environment.set('mid_post_id', json._id);",
+              "pm.environment.set('like_post_id', json._id);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Posts - Get second page using nextCursor",
       "request": {
-        "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{jwt_token}}" } ] },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
         "method": "GET",
-        "url": { "raw": "{{baseUrl}}/api/posts?limit=2&cursor={{nextCursor}}", "host": ["{{baseUrl}}"], "path": ["api","posts"], "query": [ { "key": "limit", "value": "2" }, { "key": "cursor", "value": "{{nextCursor}}" } ] }
+        "url": {
+          "raw": "{{baseUrl}}/api/posts?limit=2&cursor={{nextCursor}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "2"
+            },
+            {
+              "key": "cursor",
+              "value": "{{nextCursor}}"
+            }
+          ]
+        }
       },
       "event": [
-        { "listen": "test", "script": { "exec": [ "pm.test('Second page returns posts and no duplicates with first page', function () {", "  pm.response.to.have.status(200);", "  var json = pm.response.json();", "  pm.expect(json).to.have.property('posts');", "  var firstIds = JSON.parse(pm.environment.get('first_page_post_ids') || '[]');", "  var secondIds = json.posts.map(function(p){return p._id;});", "  secondIds.forEach(function(id){ pm.expect(firstIds.indexOf(id)).to.eql(-1); });", "});" ] } }
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Ensure cursor from first page is available",
+              "if (!pm.environment.get('nextCursor')) {",
+              "  throw new Error('Missing nextCursor from previous response');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Second page must not duplicate results from the first page",
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('posts');",
+              "const firstIds = JSON.parse(pm.environment.get('first_page_post_ids') || '[]');",
+              "const secondIds = json.posts.map((p) => p._id);",
+              "secondIds.forEach((id) => pm.expect(firstIds.indexOf(id)).to.eql(-1));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Posts - Like the inserted post",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/posts/{{like_post_id}}/like",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts",
+            "{{like_post_id}}",
+            "like"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Validate the like target exists",
+              "if (!pm.environment.get('like_post_id')) {",
+              "  throw new Error('Missing like_post_id to toggle');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// First toggle should like the post and register the user",
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('liked', true);",
+              "pm.expect(json).to.have.property('post');",
+              "pm.expect(json.post).to.have.property('_id', pm.environment.get('like_post_id'));",
+              "pm.expect(json.post.likesCount).to.eql(json.post.likes.length);",
+              "const userId = pm.environment.get('user_id');",
+              "const likedByUser = json.post.likes.some((like) => like._id === userId);",
+              "pm.expect(likedByUser).to.be.true;",
+              "pm.environment.set('likes_after_like', String(json.post.likesCount));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Posts - Unlike the inserted post",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        },
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/posts/{{like_post_id}}/like",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "posts",
+            "{{like_post_id}}",
+            "like"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Ensure we liked the post before attempting to unlike",
+              "if (!pm.environment.get('likes_after_like')) {",
+              "  throw new Error('likes_after_like missing; like step did not run');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Second toggle should remove the like and drop the count",
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json).to.have.property('liked', false);",
+              "pm.expect(json.post.likesCount).to.eql(json.post.likes.length);",
+              "const previous = parseInt(pm.environment.get('likes_after_like'), 10);",
+              "pm.expect(json.post.likesCount).to.eql(Math.max(previous - 1, 0));",
+              "const userId = pm.environment.get('user_id');",
+              "const likedByUser = json.post.likes.some((like) => like._id === userId);",
+              "pm.expect(likedByUser).to.be.false;"
+            ]
+          }
+        }
       ]
     }
   ],
   "event": [],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
-    { "key": "jwt_token", "value": "", "type": "string" },
-    { "key": "rand", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rand",
+      "value": ""
+    }
   ]
 }
