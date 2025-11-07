@@ -20,5 +20,13 @@ services:
     volumes:
       - mongodb_data:/data/db
 
+  json_server:
+    image: clue/json-server
+    ports:
+      - "4000:80"
+    volumes:
+      - ./json-serveur/db.json:/data/db.json
+    command: -H 0.0.0.0
+
 volumes:
   mongodb_data:

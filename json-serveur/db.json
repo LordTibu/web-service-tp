@@ -1,0 +1,202 @@
+{
+  "articles": [
+    {
+      "id": "a1",
+      "title": "Lorem ipsum dolor",
+      "image": "http://placehold.it/1200",
+      "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit...",
+      "date": "2024-01-20T10:21:33-01:00",
+      "tags": ["santé", "technologie"],
+      "likes": 1420
+    },
+    {
+      "id": "a2",
+      "title": "Ut enim ad minim",
+      "image": "http://placehold.it/980",
+      "content": "Sed ut perspiciatis unde omnis iste natus error sit voluptatem...",
+      "date": "2024-09-14T18:09:02-02:00",
+      "tags": ["économie", "culture"],
+      "likes": 2688
+    },
+    {
+      "id": "a3",
+      "title": "Cillum dolore fugiat",
+      "image": "http://placehold.it/2100",
+      "content": "At vero eos et accusamus et iusto odio dignissimos ducimus...",
+      "date": "2023-11-03T07:33:59-01:00",
+      "tags": ["politique"],
+      "likes": 3221
+    },
+    {
+      "id": "a4",
+      "title": "Excepteur cupidatat magna",
+      "image": "http://placehold.it/450",
+      "content": "Nam libero tempore, cum soluta nobis est eligendi optio...",
+      "date": "2022-08-23T12:12:12-02:00",
+      "tags": ["santé", "sport"],
+      "likes": 1982
+    },
+    {
+      "id": "a5",
+      "title": "Sunt in culpa",
+      "image": "http://placehold.it/3300",
+      "content": "Temporibus autem quibusdam et aut officiis debitis aut rerum...",
+      "date": "2023-06-11T09:24:55-02:00",
+      "tags": ["culture"],
+      "likes": 4033
+    },
+    {
+      "id": "a6",
+      "title": "Quis autem vel",
+      "image": "http://placehold.it/650",
+      "content": "Et harum quidem rerum facilis est et expedita distinctio...",
+      "date": "2024-04-02T22:31:10-02:00",
+      "tags": ["sport"],
+      "likes": 954
+    },
+    {
+      "id": "a7",
+      "title": "Neque porro quisquam",
+      "image": "http://placehold.it/2700",
+      "content": "Itaque earum rerum hic tenetur a sapiente delectus...",
+      "date": "2023-01-17T21:58:45-01:00",
+      "tags": ["technologie", "économie"],
+      "likes": 3744
+    },
+    {
+      "id": "a8",
+      "title": "Duis aute irure",
+      "image": "http://placehold.it/1900",
+      "content": "Quis nostrum exercitationem ullam corporis suscipit laboriosam...",
+      "date": "2022-12-09T14:44:22-01:00",
+      "tags": ["monde"],
+      "likes": 2993
+    },
+    {
+      "id": "a9",
+      "title": "Sed do eiusmod",
+      "image": "http://placehold.it/3100",
+      "content": "Nemo enim ipsam voluptatem quia voluptas sit aspernatur...",
+      "date": "2024-10-06T06:11:11-02:00",
+      "tags": ["politique", "sport"],
+      "likes": 2190
+    },
+    {
+      "id": "a10",
+      "title": "At vero eos",
+      "image": "http://placehold.it/500",
+      "content": "Nor again is there anyone who loves or pursues or desires to obtain pain...",
+      "date": "2023-03-14T03:18:32-01:00",
+      "tags": ["culture", "monde"],
+      "likes": 5112
+    }
+  ],
+
+  "comments": [
+    {
+      "comment_id": "c1",
+      "articleId": "a1",
+      "user": "Alice Martin",
+      "message": "Très bon article, clair et complet.",
+      "created_at": "2024-01-20T12:02:11-01:00"
+    },
+    {
+      "comment_id": "c2",
+      "articleId": "a1",
+      "user": "Louis Bernard",
+      "message": "J’ai appris plein de choses, merci !",
+      "created_at": "2024-02-02T17:32:43-01:00"
+    },
+    {
+      "comment_id": "c3",
+      "articleId": "a2",
+      "user": "Camille Renault",
+      "message": "Excellente analyse économique.",
+      "created_at": "2024-09-16T11:48:02-02:00"
+    },
+    {
+      "comment_id": "c4",
+      "articleId": "a2",
+      "user": "Thomas Leroy",
+      "message": "Je ne suis pas totalement d’accord.",
+      "created_at": "2024-09-18T09:00:00-02:00"
+    },
+    {
+      "comment_id": "c5",
+      "articleId": "a3",
+      "user": "Sarah Petit",
+      "message": "La politique expliquée facilement.",
+      "created_at": "2023-11-04T02:22:18-01:00"
+    },
+    {
+      "comment_id": "c6",
+      "articleId": "a4",
+      "user": "Maxime Hardy",
+      "message": "Très intéressant sur le plan médical.",
+      "created_at": "2022-09-01T19:10:12-02:00"
+    },
+    {
+      "comment_id": "c7",
+      "articleId": "a4",
+      "user": "Julie Caron",
+      "message": "J’aime beaucoup ce format.",
+      "created_at": "2022-10-12T10:33:10-02:00"
+    },
+    {
+      "comment_id": "c8",
+      "articleId": "a5",
+      "user": "Victor Lucas",
+      "message": "Très bon contenu culturel.",
+      "created_at": "2023-07-01T21:10:44-02:00"
+    },
+    {
+      "comment_id": "c9",
+      "articleId": "a6",
+      "user": "Emma Roux",
+      "message": "Un point de vue sportif très intéressant.",
+      "created_at": "2024-04-03T12:48:55-02:00"
+    },
+    {
+      "comment_id": "c10",
+      "articleId": "a6",
+      "user": "Julien Fabre",
+      "message": "Trop court !",
+      "created_at": "2024-04-04T09:22:11-02:00"
+    },
+    {
+      "comment_id": "c11",
+      "articleId": "a7",
+      "user": "Clara Noël",
+      "message": "Article très complet.",
+      "created_at": "2023-01-19T15:14:22-01:00"
+    },
+    {
+      "comment_id": "c12",
+      "articleId": "a8",
+      "user": "Lucas Meynier",
+      "message": "Super perspectives internationales.",
+      "created_at": "2022-12-10T17:21:03-01:00"
+    },
+    {
+      "comment_id": "c13",
+      "articleId": "a8",
+      "user": "Justine Val",
+      "message": "Très instructif.",
+      "created_at": "2022-12-12T09:10:44-01:00"
+    },
+    {
+      "comment_id": "c14",
+      "articleId": "a9",
+      "user": "Thomas Chevalier",
+      "message": "J’aime bien l’angle politique.",
+      "created_at": "2024-10-08T22:45:27-02:00"
+    },
+    {
+      "comment_id": "c15",
+      "articleId": "a10",
+      "user": "Nina Lopez",
+      "message": "Passionnant de bout en bout.",
+      "created_at": "2023-03-16T04:26:41-01:00"
+    }
+  ]
+}
